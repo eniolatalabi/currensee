@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../core/theme.dart';
+import '../widgets/loading_spinner.dart';
 
 enum ButtonVariant { filled, outlined, text }
 
 enum ButtonStatus { normal, success, error, warning }
+
+/// 🔑 New button sizes
+enum ButtonSize { small, medium, large }
 
 class CustomButton extends StatefulWidget {
   final String label;
   final Future<void> Function()? onPressed;
   final ButtonVariant variant;
   final ButtonStatus status;
+  final ButtonSize size;
   final bool isLoading;
   final double? width;
   final double? height;
   final Widget? icon;
 
-  // 🔑 New optional overrides
+  // 🔑 Optional overrides
   final Color? backgroundColor;
   final Color? foregroundColor;
   final Color? borderColor;
@@ -27,6 +32,7 @@ class CustomButton extends StatefulWidget {
     required this.onPressed,
     this.variant = ButtonVariant.filled,
     this.status = ButtonStatus.normal,
+    this.size = ButtonSize.medium,
     this.isLoading = false,
     this.width,
     this.height,
@@ -42,6 +48,53 @@ class CustomButton extends StatefulWidget {
 
 class _CustomButtonState extends State<CustomButton> {
   bool _loading = false;
+
+  /// 🔑 Button height based on size (width is usually infinity unless overridden)
+  double _getHeight() {
+    if (widget.height != null) return widget.height!;
+    switch (widget.size) {
+      case ButtonSize.small:
+        return 36;
+      case ButtonSize.medium:
+        return 48;
+      case ButtonSize.large:
+        return 56;
+    }
+  }
+
+  double _getFontSize() {
+    switch (widget.size) {
+      case ButtonSize.small:
+        return 14;
+      case ButtonSize.medium:
+        return 16;
+      case ButtonSize.large:
+        return 18;
+    }
+  }
+
+  double _getIconSpacing() {
+    switch (widget.size) {
+      case ButtonSize.small:
+        return 8;
+      case ButtonSize.medium:
+        return 12;
+      case ButtonSize.large:
+        return 14;
+    }
+  }
+
+  /// 🔑 Spinner size scales with button size
+  double _getSpinnerSize() {
+    switch (widget.size) {
+      case ButtonSize.small:
+        return 14;
+      case ButtonSize.medium:
+        return 16;
+      case ButtonSize.large:
+        return 20;
+    }
+  }
 
   Color _getBackgroundColor() {
     if (widget.backgroundColor != null) return widget.backgroundColor!;
@@ -80,6 +133,7 @@ class _CustomButtonState extends State<CustomButton> {
     final theme = Theme.of(context);
     final textStyle = theme.textTheme.labelLarge?.copyWith(
       fontWeight: FontWeight.w600,
+      fontSize: _getFontSize(),
     );
 
     switch (widget.variant) {
@@ -95,7 +149,7 @@ class _CustomButtonState extends State<CustomButton> {
   Widget _buildFilled(TextStyle? textStyle) {
     return SizedBox(
       width: widget.width ?? double.infinity,
-      height: widget.height ?? 48,
+      height: _getHeight(),
       child: ElevatedButton(
         onPressed: _loading || widget.onPressed == null
             ? null
@@ -115,12 +169,9 @@ class _CustomButtonState extends State<CustomButton> {
           ),
         ),
         child: _loading
-            ? SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: _getForegroundColor(),
-                ),
+            ? LoadingSpinner(
+                customSize: _getSpinnerSize(),
+                customColor: _getForegroundColor(),
               )
             : _buildChild(textStyle, _getForegroundColor()),
       ),
@@ -132,7 +183,7 @@ class _CustomButtonState extends State<CustomButton> {
 
     return SizedBox(
       width: widget.width ?? double.infinity,
-      height: widget.height ?? 48,
+      height: _getHeight(),
       child: OutlinedButton(
         onPressed: _loading || widget.onPressed == null
             ? null
@@ -146,18 +197,15 @@ class _CustomButtonState extends State<CustomButton> {
               },
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: _getOutlineColor(), width: 2),
-          foregroundColor: textColor, 
+          foregroundColor: textColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.radius),
           ),
         ),
         child: _loading
-            ? SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: textColor,
-                ),
+            ? LoadingSpinner(
+                customSize: _getSpinnerSize(),
+                customColor: textColor,
               )
             : _buildChild(textStyle, textColor),
       ),
@@ -178,16 +226,11 @@ class _CustomButtonState extends State<CustomButton> {
                 if (mounted) setState(() => _loading = false);
               }
             },
-      style: TextButton.styleFrom(
-        foregroundColor: textColor, 
-      ),
+      style: TextButton.styleFrom(foregroundColor: textColor),
       child: _loading
-          ? SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: textColor,
-              ),
+          ? LoadingSpinner(
+              customSize: _getSpinnerSize(),
+              customColor: textColor,
             )
           : _buildChild(textStyle, textColor),
     );
@@ -200,7 +243,7 @@ class _CustomButtonState extends State<CustomButton> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           widget.icon!,
-          const SizedBox(width: 12),
+          SizedBox(width: _getIconSpacing()),
           Text(widget.label, style: style?.copyWith(color: textColor)),
         ],
       );

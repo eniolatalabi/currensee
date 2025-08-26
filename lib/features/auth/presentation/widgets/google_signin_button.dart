@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:currensee/data/services/auth_service.dart';
 import 'package:currensee/widgets/custom_button.dart';
 
 class GoogleSignInButton extends StatelessWidget {
@@ -20,20 +19,8 @@ class GoogleSignInButton extends StatelessWidget {
       onPressed:
           onPressed ??
           () async {
-            final user = await AuthService.instance.signInWithGoogle();
-
-            if (!context.mounted) return;
-            final scaffold = ScaffoldMessenger.of(context);
-
-            if (user != null) {
-              scaffold.showSnackBar(
-                const SnackBar(content: Text('Sign-In successful!')),
-              );
-            } else {
-              scaffold.showSnackBar(
-                const SnackBar(content: Text('Sign-In canceled.')),
-              );
-            }
+            //
+            // 
           },
     );
   }

@@ -9,7 +9,10 @@ class AuthTextField extends StatelessWidget {
   final bool isPassword;
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
-  final bool isLoading;
+  final bool isLoading; // disables field during loading
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
 
   const AuthTextField({
     super.key,
@@ -19,15 +22,16 @@ class AuthTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.isLoading = false,
+    this.focusNode,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Auth-specific defaults: for example, email keyboard if hintText contains "email"
-    TextInputType effectiveKeyboardType = keyboardType;
-    if (hintText.toLowerCase().contains("email")) {
-      effectiveKeyboardType = TextInputType.emailAddress;
-    }
+    // Auth-specific defaults: email keyboard if hintText contains "email"
+    final effectiveKeyboardType =
+        hintText.toLowerCase().contains("email") ? TextInputType.emailAddress : keyboardType;
 
     return CustomTextField(
       controller: controller,
@@ -35,7 +39,10 @@ class AuthTextField extends StatelessWidget {
       keyboardType: effectiveKeyboardType,
       isPassword: isPassword,
       validator: validator,
-      isLoading: isLoading,
+      focusNode: focusNode,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
+      enabled: !isLoading, 
     );
   }
 }

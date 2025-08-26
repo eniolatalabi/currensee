@@ -35,6 +35,11 @@
 			</array>
 		</dict>
 	</array>
+
+	<!-- ✅ Added for Firebase -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>

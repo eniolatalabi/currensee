@@ -3,7 +3,7 @@ import '../core/theme.dart';
 import '../core/constants.dart';
 
 /// CustomTextField - reusable styled text field
-/// Supports password toggle, validation, loading, and consistent theming.
+/// Supports password toggle, validation, loading, enabled/disabled, focus, and submit actions.
 class CustomTextField extends StatefulWidget {
   final String hintText;
   final TextEditingController controller;
@@ -11,6 +11,12 @@ class CustomTextField extends StatefulWidget {
   final bool isPassword;
   final String? Function(String?)? validator;
   final bool isLoading;
+
+  // Add support for forwarding
+  final bool? enabled;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
 
   const CustomTextField({
     super.key,
@@ -20,6 +26,10 @@ class CustomTextField extends StatefulWidget {
     this.isPassword = false,
     this.validator,
     this.isLoading = false,
+    this.enabled,
+    this.focusNode,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -27,7 +37,7 @@ class CustomTextField extends StatefulWidget {
 }
 
 class _CustomTextFieldState extends State<CustomTextField> {
-  bool _obscure = true; // Toggle for password visibility
+  bool _obscure = true;
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +52,16 @@ class _CustomTextFieldState extends State<CustomTextField> {
           keyboardType: widget.keyboardType,
           obscureText: widget.isPassword ? _obscure : false,
           validator: widget.validator,
-          enabled: !widget.isLoading,
+          enabled: widget.enabled ?? !widget.isLoading,
+          focusNode: widget.focusNode,
+          textInputAction: widget.textInputAction,
+          onFieldSubmitted: widget.onFieldSubmitted,
           decoration: InputDecoration(
             hintText: widget.hintText,
             filled: true,
-            fillColor: isDark 
-            ? AppTheme.darkInputBackground 
-            : AppTheme.lightInputBackground,
-
+            fillColor: isDark
+                ? AppTheme.darkInputBackground
+                : AppTheme.lightInputBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.radius),
               borderSide: BorderSide.none,

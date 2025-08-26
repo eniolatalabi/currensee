@@ -7,6 +7,7 @@ class AppTheme {
   static const Color successColor = Color(0xFF28A745);
   static const Color errorColor = Color(0xFFDC3545);
   static const Color warningColor = Color(0xFFFFC107);
+  static const Color secondaryColor = Color(0xFF6F42C1);
 
   // Light mode colors
   static const Color lightBackground = Colors.white;
@@ -59,16 +60,16 @@ class AppTheme {
   }
 
   /// ===== Light Theme =====
-static final ThemeData lightTheme = ThemeData(
-  brightness: Brightness.light,
-  colorScheme: const ColorScheme.light(
-    primary: primaryColor,
-    secondary: primaryColor,
-    surface: lightBackground,
-    error: errorColor,
-  ),
-  scaffoldBackgroundColor: lightBackground,
-  textTheme: _baseTextTheme(lightTextPrimary),
+  static final ThemeData lightTheme = ThemeData(
+    brightness: Brightness.light,
+    colorScheme: const ColorScheme.light(
+      primary: primaryColor,
+      secondary: primaryColor,
+      surface: lightBackground,
+      error: errorColor,
+    ),
+    scaffoldBackgroundColor: lightBackground,
+    textTheme: _baseTextTheme(lightTextPrimary),
 
     // Elevated Buttons
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -154,16 +155,16 @@ static final ThemeData lightTheme = ThemeData(
   );
 
   /// ===== Dark Theme =====
-static final ThemeData darkTheme = ThemeData(
-  brightness: Brightness.dark,
-  colorScheme: const ColorScheme.dark(
-    primary: primaryColor,
-    secondary: primaryColor,
-    surface: darkBackground,
-    error: errorColor,
-  ),
-  scaffoldBackgroundColor: darkBackground,
-  textTheme: _baseTextTheme(darkTextPrimary),
+  static final ThemeData darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: primaryColor,
+      secondary: primaryColor,
+      surface: darkBackground,
+      error: errorColor,
+    ),
+    scaffoldBackgroundColor: darkBackground,
+    textTheme: _baseTextTheme(darkTextPrimary),
 
     // Elevated Buttons
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -248,22 +249,17 @@ static final ThemeData darkTheme = ThemeData(
     ),
   );
 
-  /// ===== Text Logo =====
-  static const String appName = "CurrenSee";
-
+  /// ===== Logo Widget =====
   static Widget logo({
-    double fontSize = 36,
+    double size = 48,
     Color? color,
-    FontWeight fontWeight = FontWeight.bold,
+    FontWeight fontWeight =
+        FontWeight.bold, // not needed anymore but keeping for API consistency
   }) {
-    return Text(
-      appName,
-      style: TextStyle(
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-        color: color ?? primaryColor,
-        letterSpacing: 1.2,
-      ),
+    return Icon(
+      Icons.monetization_on, // Monetization icon
+      size: size,
+      color: color ?? primaryColor,
     );
   }
 

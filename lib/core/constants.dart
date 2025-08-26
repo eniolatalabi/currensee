@@ -1,3 +1,4 @@
+// lib/core/constants.dart
 import 'package:flutter/material.dart';
 
 class AppConstants {
@@ -36,4 +37,8 @@ class AppConstants {
       offset: const Offset(0, 3),
     ),
   ];
+
+  /// ===== Auth Layout =====
+  /// Single source of truth so Google button, inputs, and CTAs share width.
+  static const double authInputWidth = 360.0;
 }

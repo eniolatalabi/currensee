@@ -37,6 +37,13 @@
             {
               "client_id": "418964530645-b1n8qg2upp76ftiq165mncskltqqf6a9.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "418964530645-i8k4n3u6tith8itoujvacgrf1v303nfn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.currensee"
+              }
             }
           ]
         }
