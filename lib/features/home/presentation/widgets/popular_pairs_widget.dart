@@ -2,8 +2,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants.dart';
 import '../../../../data/services/currency_service.dart';
+import '../../../../data/services/preferences_service.dart';
+import '../../../profile/controller/preferences_controller.dart';
 
 // PopularPair model class
 class PopularPair {
@@ -30,6 +33,8 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
   List<PopularPair> _popularPairs = [];
   bool _isLoading = true;
   String? _error;
+  String _userBaseCurrency = 'NGN';
+  String? _lastBaseCurrency;
 
   // Animation controllers
   late final AnimationController _pulseController;
@@ -43,8 +48,11 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
   late final Animation<double> _cardScaleAnimation;
   late final Animation<double> _floatingAnimation;
 
-  final List<String> _popularCurrencies = ['USD', 'GBP', 'EUR', 'CAD'];
-  final String _baseCurrency = 'NGN';
+  // Primary popular currencies (ordered by global usage)
+  static const List<String> _primaryCurrencies = ['USD', 'EUR', 'GBP', 'JPY'];
+
+  // Secondary currencies used when user's base currency conflicts
+  static const List<String> _secondaryCurrencies = ['CAD', 'AUD', 'CHF', 'CNY'];
 
   // Color palette for cards
   final List<List<Color>> _cardGradients = [
@@ -96,8 +104,7 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
       CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
     );
 
-    _loadPopularPairs();
-    _startPriceUpdates();
+    _loadUserPreferences();
 
     // Start continuous animations
     _shimmerController.repeat(reverse: true);
@@ -114,10 +121,61 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
     super.dispose();
   }
 
+  Future<void> _loadUserPreferences() async {
+    try {
+      // Try to get from PreferencesController if available
+      if (mounted) {
+        try {
+          final prefsController = context.read<PreferencesController>();
+          _userBaseCurrency = prefsController.preferences.defaultBaseCurrency;
+        } catch (e) {
+          // Fallback to direct service call
+          final prefs = await PreferencesService.instance.getUserPreferences();
+          _userBaseCurrency = prefs.defaultBaseCurrency;
+        }
+      }
+
+      _lastBaseCurrency = _userBaseCurrency;
+      await _loadPopularPairs();
+      _startPriceUpdates();
+    } catch (e) {
+      debugPrint('Error loading user preferences: $e');
+      _userBaseCurrency = 'NGN'; // fallback
+      _lastBaseCurrency = _userBaseCurrency;
+      await _loadPopularPairs();
+      _startPriceUpdates();
+    }
+  }
+
   void _startPriceUpdates() {
     _priceUpdateTimer = Timer.periodic(const Duration(seconds: 35), (_) {
       _updatePrices();
     });
+  }
+
+  /// Get popular currencies excluding user's base currency
+  List<String> _getPopularCurrencies() {
+    List<String> currencies = [];
+
+    // Start with primary currencies, excluding user's base currency
+    for (String currency in _primaryCurrencies) {
+      if (currency != _userBaseCurrency) {
+        currencies.add(currency);
+      }
+    }
+
+    // If we need more currencies (user's base was in primary list), add from secondary
+    if (currencies.length < 4) {
+      for (String currency in _secondaryCurrencies) {
+        if (currency != _userBaseCurrency && !currencies.contains(currency)) {
+          currencies.add(currency);
+          if (currencies.length >= 4) break;
+        }
+      }
+    }
+
+    // Take only first 4 currencies
+    return currencies.take(4).toList();
   }
 
   Future<void> _loadPopularPairs() async {
@@ -125,6 +183,16 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
       _isLoading = true;
       _error = null;
     });
+
+    // Update user base currency if it changed
+    if (mounted) {
+      try {
+        final prefsController = context.read<PreferencesController>();
+        _userBaseCurrency = prefsController.preferences.defaultBaseCurrency;
+      } catch (e) {
+        // Keep existing value if preferences not available
+      }
+    }
 
     // Simulate loading for better UX
     await Future.delayed(const Duration(milliseconds: 1000));
@@ -187,26 +255,27 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
   }
 
   Future<List<PopularPair>> _fetchPopularPairs() async {
+    final popularCurrencies = _getPopularCurrencies();
     final List<PopularPair> pairs = [];
 
-    for (final currency in _popularCurrencies) {
+    for (final currency in popularCurrencies) {
       try {
         final rate = await CurrencyService.instance.getRate(
           base: currency,
-          target: _baseCurrency,
+          target: _userBaseCurrency,
         );
 
         if (rate != null) {
           pairs.add(
             PopularPair(
               from: currency,
-              to: _baseCurrency,
+              to: _userBaseCurrency,
               rate: rate.toStringAsFixed(2),
             ),
           );
         }
       } catch (e) {
-        debugPrint("Failed to fetch rate for $currency/$_baseCurrency: $e");
+        debugPrint("Failed to fetch rate for $currency/$_userBaseCurrency: $e");
       }
     }
 
@@ -214,30 +283,71 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
   }
 
   List<PopularPair> _getDefaultPairs() {
-    return [
-      PopularPair(from: "USD", to: "NGN", rate: "1650.50"),
-      PopularPair(from: "GBP", to: "NGN", rate: "2089.75"),
-      PopularPair(from: "EUR", to: "NGN", rate: "1789.25"),
-      PopularPair(from: "CAD", to: "NGN", rate: "1210.80"),
-    ];
+    final popularCurrencies = _getPopularCurrencies();
+    final List<PopularPair> defaultPairs = [];
+
+    // Default rates based on common exchange rates (adjust as needed)
+    final Map<String, String> defaultRates = {
+      'USD': '1650.50',
+      'EUR': '1789.25',
+      'GBP': '2089.75',
+      'JPY': '11.50',
+      'CAD': '1210.80',
+      'AUD': '1089.25',
+      'CHF': '1825.40',
+      'CNY': '228.75',
+    };
+
+    for (int i = 0; i < popularCurrencies.length && i < 4; i++) {
+      final currency = popularCurrencies[i];
+      defaultPairs.add(
+        PopularPair(
+          from: currency,
+          to: _userBaseCurrency,
+          rate: defaultRates[currency] ?? '1000.00',
+        ),
+      );
+    }
+
+    return defaultPairs;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.paddingMedium,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildAdvancedHeader(context),
-          const SizedBox(height: 16),
-          _isLoading
-              ? _buildAdvancedSkeleton(context)
-              : _buildPopularPairsContent(),
-        ],
-      ),
+    return Consumer<PreferencesController>(
+      builder: (context, prefsController, child) {
+        final currentBaseCurrency =
+            prefsController.preferences.defaultBaseCurrency;
+
+        // Check if base currency changed
+        if (_lastBaseCurrency != currentBaseCurrency) {
+          // Base currency changed, reload pairs
+          _userBaseCurrency = currentBaseCurrency;
+          _lastBaseCurrency = currentBaseCurrency;
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _loadPopularPairs();
+            }
+          });
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppConstants.paddingMedium,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildAdvancedHeader(context),
+              const SizedBox(height: 16),
+              _isLoading
+                  ? _buildAdvancedSkeleton(context)
+                  : _buildPopularPairsContent(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -293,7 +403,7 @@ class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "Live exchange rates",
+                  "Live rates • Base: $_userBaseCurrency",
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
