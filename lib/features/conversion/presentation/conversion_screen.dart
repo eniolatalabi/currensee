@@ -8,17 +8,15 @@ import '../../../data/services/currency_service.dart';
 import '../controller/conversion_controller.dart';
 import 'widgets/amount_input.dart';
 import '../presentation/widgets/conversion_result.dart';
-import 'widgets/currency_search_sheet.dart' as search_sheet;
+import 'widgets/currency_search_sheet.dart';
 
 class ConversionScreen extends StatelessWidget {
   const ConversionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ConversionController>(
-      create: (_) => ConversionController(CurrencyService.instance),
-      child: const _ConversionView(),
-    );
+    // Use existing ConversionController from provider instead of creating new one
+    return const _ConversionView();
   }
 }
 
@@ -109,12 +107,14 @@ class _ConversionViewState extends State<_ConversionView>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.primary.withOpacity(0.1),
-            theme.colorScheme.primaryContainer.withOpacity(0.05),
+            theme.colorScheme.primary.withValues(alpha: 0.1),
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        ),
       ),
       child: Row(
         children: [
@@ -140,7 +140,9 @@ class _ConversionViewState extends State<_ConversionView>
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                    color: theme.colorScheme.primaryContainer.withValues(
+                      alpha: 0.3,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -156,7 +158,7 @@ class _ConversionViewState extends State<_ConversionView>
                   Text(
                     'Updated ${_formatLastUpdated(controller.lastUpdated!)}',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -225,10 +227,12 @@ class _ConversionViewState extends State<_ConversionView>
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.1)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -241,7 +245,9 @@ class _ConversionViewState extends State<_ConversionView>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
@@ -284,13 +290,13 @@ class _ConversionViewState extends State<_ConversionView>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isPrimary
-              ? theme.colorScheme.primaryContainer.withOpacity(0.1)
-              : theme.colorScheme.secondaryContainer.withOpacity(0.1),
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.1)
+              : theme.colorScheme.secondaryContainer.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isPrimary
-                ? theme.colorScheme.primary.withOpacity(0.2)
-                : theme.colorScheme.secondary.withOpacity(0.2),
+                ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                : theme.colorScheme.secondary.withValues(alpha: 0.2),
           ),
         ),
         child: Row(
@@ -301,8 +307,8 @@ class _ConversionViewState extends State<_ConversionView>
               height: 40,
               decoration: BoxDecoration(
                 color: isPrimary
-                    ? theme.colorScheme.primary.withOpacity(0.1)
-                    : theme.colorScheme.secondary.withOpacity(0.1),
+                    ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                    : theme.colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
@@ -327,7 +333,7 @@ class _ConversionViewState extends State<_ConversionView>
                   Text(
                     label,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -353,7 +359,7 @@ class _ConversionViewState extends State<_ConversionView>
 
             Icon(
               Icons.keyboard_arrow_right,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -377,7 +383,7 @@ class _ConversionViewState extends State<_ConversionView>
           controller.swapCurrencies();
         },
         borderRadius: BorderRadius.circular(12),
-        child: Container(
+        child: SizedBox(
           width: 40,
           height: 40,
           child: Icon(
@@ -407,7 +413,7 @@ class _ConversionViewState extends State<_ConversionView>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -464,8 +470,6 @@ class _ConversionViewState extends State<_ConversionView>
     BuildContext context,
     ConversionController controller,
   ) {
-    final theme = Theme.of(context);
-
     return Padding(
       padding: const EdgeInsets.only(top: AppConstants.paddingMedium),
       child: Row(
@@ -506,9 +510,13 @@ class _ConversionViewState extends State<_ConversionView>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.3,
+          ),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -538,7 +546,7 @@ class _ConversionViewState extends State<_ConversionView>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => search_sheet.CurrencySearchSheet(
+      builder: (_) => EnhancedCurrencySearchSheet(
         isBaseCurrency: isBaseCurrency,
         controller: controller,
         currentSelection: isBaseCurrency

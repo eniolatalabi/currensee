@@ -147,10 +147,12 @@ class _AmountInputState extends State<AmountInput> {
                 prefixText: widget.compact
                     ? null
                     : '${widget.controller.baseCurrency} ',
+                // ISSUE 3 FIX: Make currency label respect theme
                 prefixStyle: widget.compact
                     ? null
                     : theme.textTheme.headlineSmall?.copyWith(
-                        color: Colors.black,
+                        color:
+                            theme.colorScheme.onSurface, // Respect theme color
                         fontWeight: FontWeight.w600,
                       ),
                 border: InputBorder.none,

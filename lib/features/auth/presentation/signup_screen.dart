@@ -1,3 +1,4 @@
+// lib/features/auth/presentation/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -113,7 +114,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     authController.clearMessages();
 
-    final success = await authController.signUpWithEmail(
+    // FIXED: Corrected method name from signUpWithEmail to createAccount
+    final success = await authController.createAccount(
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),

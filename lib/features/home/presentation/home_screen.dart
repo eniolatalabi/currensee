@@ -1,17 +1,19 @@
-
-
+// lib/features/home/presentation/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../../../../core/constants.dart';
-
-// Use prefix for controller import
-import '../../home/controller/home_controller.dart' as home_controller;
-
+import '../../../core/constants.dart';
+import '../../../data/services/currency_service.dart';
+import '../../../features/auth/controller/auth_controller.dart';
+import '../../../features/history/controller/history_controller.dart';
+import '../../../features/history/service/conversion_history_service.dart';
+import '../../../features/conversion/controller/conversion_controller.dart';
+// prefix for controller import
+import '../controller/home_controller.dart' as home_controller;
 // Prefix widget imports to avoid name conflicts
 import 'widgets/quick_conversion.dart';
 import 'widgets/market_overview_widget.dart' as market_widget;
 import 'widgets/popular_pairs_widget.dart' as popular_widget;
+import 'widgets/recent_activity_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,8 +22,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
   late home_controller.HomeController _homeController;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -36,8 +42,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return RefreshIndicator(
-      onRefresh: _homeController.refreshHomeData,
+      onRefresh: () async {
+        await _homeController.refreshHomeData();
+        // Also refresh recent activity
+        if (mounted) {
+          context.read<HistoryController>().loadRecent(limit: 5);
+        }
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -45,11 +59,11 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const SizedBox(height: AppConstants.paddingMedium),
 
-            // ✅ Hero Section
-            const QuickConversion(),
+            // EDITED: Wrap QuickConversion in its own provider to isolate its state
+            const QuickConversionProvider(),
             const SizedBox(height: AppConstants.paddingMedium),
 
-            // Market Overview - Now using widget with API integration
+            // Market Overview
             market_widget.MarketOverviewWidget(
               onMarketPairTap: (baseCurrency, targetCurrency) {
                 _homeController.onMarketPairTap(
@@ -64,8 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppConstants.paddingMedium),
 
-            // Popular Pairs - Now using widget with API integration
-            popular_widget.PopularPairsWidget(
+            // Popular Pairs
+            popular_widget.EnhancedPopularPairsWidget(
               onPopularPairTap: (fromCurrency, toCurrency) {
                 _homeController.onPopularPairTap(
                   home_controller.PopularPair(
@@ -78,177 +92,71 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppConstants.paddingMedium),
 
-            // Conversion History - Kept as is (Phase 5 implementation)
-            _buildConversionHistory(context),
+            // Recent Activity - Conversion History from SQLite
+            const RecentActivityWidget(),
             const SizedBox(height: AppConstants.paddingLarge),
           ],
         ),
       ),
     );
   }
+}
 
-  // ------------------ Conversion History ------------------
-  Widget _buildConversionHistory(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.paddingMedium,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            context,
-            "Conversion History",
-            onViewAll: context
-                .read<home_controller.HomeController>()
-                .onViewAllHistoryTap,
-          ),
-          const SizedBox(height: 12),
-          Consumer<home_controller.HomeController>(
-            builder: (context, homeController, child) {
-              if (homeController.isLoadingActivities) {
-                return Column(
-                  children: List.generate(
-                    3,
-                    (index) => _buildHistoryItemSkeleton(context),
-                  ),
-                );
-              }
-              return Column(
-                children: homeController.recentActivities
-                    .where(
-                      (a) => a.type == home_controller.ActivityType.conversion,
-                    )
-                    .map((a) => _buildHistoryItem(context, a))
-                    .toList(),
-              );
-            },
-          ),
-        ],
-      ),
+/// EDITED: New widget to provide an isolated ConversionController to QuickConversion
+class QuickConversionProvider extends StatefulWidget {
+  const QuickConversionProvider({super.key});
+
+  @override
+  State<QuickConversionProvider> createState() =>
+      _QuickConversionProviderState();
+}
+
+class _QuickConversionProviderState extends State<QuickConversionProvider> {
+  late final ConversionController _quickConversionController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create a dedicated controller instance for QuickConversion.
+    _quickConversionController = ConversionController(
+      CurrencyService.instance, // Assumes singleton instance
+      context.read<ConversionHistoryService>(),
     );
+
+    // Set user ID for this controller instance
+    final authController = context.read<AuthController>();
+    if (authController.currentUser != null &&
+        !authController.currentUser.isGuest) {
+      _quickConversionController.setCurrentUserId(
+        authController.currentUser.uid,
+      );
+    }
+
+    // Set up the success callback to refresh history
+    final historyController = context.read<HistoryController>();
+    _quickConversionController.setConversionSuccessCallback((message) {
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            historyController.loadRecent(limit: 5);
+          }
+        });
+      }
+    });
   }
 
-  Widget _buildHistoryItemSkeleton(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      height: 68,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-    );
+  @override
+  void dispose() {
+    _quickConversionController.dispose();
+    super.dispose();
   }
 
-  Widget _buildHistoryItem(
-    BuildContext context,
-    home_controller.RecentActivity activity,
-  ) {
-    return GestureDetector(
-      onTap: () => context
-          .read<home_controller.HomeController>()
-          .onRecentActivityTap(activity),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  activity.title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  activity.timeAgo,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  _getSourceAmount(activity.title),
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  activity.amount,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    // Provide the dedicated controller to the QuickConversion widget
+    return ChangeNotifierProvider.value(
+      value: _quickConversionController,
+      child: const QuickConversion(),
     );
-  }
-
-  // ------------------ Helpers ------------------
-  Widget _buildSectionHeader(
-    BuildContext context,
-    String title, {
-    VoidCallback? onViewAll,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        if (onViewAll != null)
-          TextButton(
-            onPressed: onViewAll,
-            child: Text(
-              "View All",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontSize: 14,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _getSourceAmount(String title) {
-    if (title.contains("USD")) return "\$50.00";
-    if (title.contains("GBP")) return "£75.00";
-    if (title.contains("EUR")) return "€60.00";
-    return "\$0.00";
   }
 }

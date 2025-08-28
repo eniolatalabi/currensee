@@ -5,8 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../conversion/controller/conversion_controller.dart';
 import '../../../conversion/presentation/widgets/amount_input.dart';
 import '../../../conversion/presentation/widgets/conversion_result.dart';
-import '../../../conversion/presentation/widgets/currency_search_sheet.dart'
-    as search_sheet;
+import '../../../conversion/presentation/widgets/currency_search_sheet.dart';
 import '../../../../core/constants.dart';
 import '../../../../data/services/currency_service.dart';
 
@@ -56,11 +55,11 @@ class _QuickConversionState extends State<QuickConversion>
               color: theme.cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.1),
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -86,13 +85,15 @@ class _QuickConversionState extends State<QuickConversion>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.primary.withOpacity(0.08),
-            theme.colorScheme.primaryContainer.withOpacity(0.04),
+            theme.colorScheme.primary.withValues(alpha: 0.08),
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.04),
           ],
         ),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1)),
+          bottom: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          ),
         ),
       ),
       child: Row(
@@ -123,7 +124,7 @@ class _QuickConversionState extends State<QuickConversion>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -205,13 +206,13 @@ class _QuickConversionState extends State<QuickConversion>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isPrimary
-              ? theme.colorScheme.primaryContainer.withOpacity(0.1)
-              : theme.colorScheme.secondaryContainer.withOpacity(0.1),
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.1)
+              : theme.colorScheme.secondaryContainer.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isPrimary
-                ? theme.colorScheme.primary.withOpacity(0.2)
-                : theme.colorScheme.secondary.withOpacity(0.2),
+                ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                : theme.colorScheme.secondary.withValues(alpha: 0.2),
           ),
         ),
         child: Column(
@@ -222,8 +223,8 @@ class _QuickConversionState extends State<QuickConversion>
               height: 32,
               decoration: BoxDecoration(
                 color: isPrimary
-                    ? theme.colorScheme.primary.withOpacity(0.1)
-                    : theme.colorScheme.secondary.withOpacity(0.1),
+                    ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                    : theme.colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
@@ -244,7 +245,7 @@ class _QuickConversionState extends State<QuickConversion>
             Text(
               label,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -265,7 +266,7 @@ class _QuickConversionState extends State<QuickConversion>
             Icon(
               Icons.keyboard_arrow_down,
               size: 16,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -289,7 +290,7 @@ class _QuickConversionState extends State<QuickConversion>
           controller.swapCurrencies();
         },
         borderRadius: BorderRadius.circular(10),
-        child: Container(
+        child: SizedBox(
           width: 36,
           height: 36,
           child: Icon(
@@ -310,9 +311,11 @@ class _QuickConversionState extends State<QuickConversion>
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.1)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+        ),
       ),
       child: Column(
         children: [
@@ -360,44 +363,48 @@ class _QuickConversionState extends State<QuickConversion>
       height: canConvert ? 48 : 0,
       margin: EdgeInsets.only(bottom: canConvert ? 16 : 0),
       child: canConvert
-          ? Container(
+          ? SizedBox(
               width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-                onPressed: controller.loading ? null : controller.manualConvert,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                icon: controller.loading
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: theme.colorScheme.onPrimary,
-                        ),
-                      )
-                    : Icon(Icons.currency_exchange, size: 16),
-                label: Text(
-                  controller.loading ? 'Converting...' : 'Convert',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                // EDITED: Changed to ElevatedButton and updated child for loading state
+                child: ElevatedButton(
+                  onPressed: controller.loading
+                      ? null
+                      : controller.manualConvert,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: controller.loading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Text(
+                          'Convert',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             )
@@ -434,7 +441,7 @@ class _QuickConversionState extends State<QuickConversion>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => search_sheet.CurrencySearchSheet(
+      builder: (_) => EnhancedCurrencySearchSheet(
         isBaseCurrency: isBaseCurrency,
         controller: controller,
         currentSelection: isBaseCurrency

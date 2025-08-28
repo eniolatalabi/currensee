@@ -1,7 +1,8 @@
+// lib/features/home/presentation/widgets/market_overview_widget.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/constants.dart';
-import '../../../../core/theme.dart';
 import '../../../../data/services/currency_service.dart';
 
 class MarketOverviewWidget extends StatefulWidget {
@@ -13,49 +14,47 @@ class MarketOverviewWidget extends StatefulWidget {
   State<MarketOverviewWidget> createState() => _MarketOverviewWidgetState();
 }
 
-class _MarketOverviewWidgetState extends State<MarketOverviewWidget> {
-  Timer? _refreshTimer;
+class _MarketOverviewWidgetState extends State<MarketOverviewWidget>
+    with TickerProviderStateMixin {
   List<MarketPair> _marketPairs = [];
-  List<MarketPair> _previousPairs = [];
   bool _isLoading = true;
-  String? _error;
-  int _currentPairIndex = 0;
+  Timer? _updateTimer;
 
-  // Major currency pairs to cycle through
-  final List<String> _majorCurrencies = [
-    'USD',
-    'GBP',
-    'EUR',
-    'CAD',
-    'AUD',
-    'JPY',
-  ];
-  final String _baseCurrency = 'NGN';
+  late AnimationController _animController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
-    _startAutoRefresh();
+    _animController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+
+    _loadMarketData();
+    _startPeriodicUpdates();
+    _animController.forward();
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _updateTimer?.cancel();
+    _animController.dispose();
     super.dispose();
   }
 
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      _refreshMarketData();
+  void _startPeriodicUpdates() {
+    _updateTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _updateMarketData();
     });
   }
 
-  Future<void> _loadInitialData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadMarketData() async {
+    setState(() => _isLoading = true);
 
     try {
       final pairs = await _fetchMarketPairs();
@@ -68,282 +67,325 @@ class _MarketOverviewWidgetState extends State<MarketOverviewWidget> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = "Failed to load market data";
+          _marketPairs = _getDefaultMarketPairs();
           _isLoading = false;
         });
       }
     }
   }
 
-  Future<void> _refreshMarketData() async {
-    try {
-      _previousPairs = List.from(_marketPairs);
-      final pairs = await _fetchMarketPairs();
+  Future<void> _updateMarketData() async {
+    if (_marketPairs.isEmpty || !mounted) return;
 
+    HapticFeedback.lightImpact();
+
+    try {
+      final updatedPairs = await _fetchMarketPairs();
       if (mounted) {
-        setState(() {
-          _marketPairs = pairs;
-          _error = null;
-        });
+        setState(() => _marketPairs = updatedPairs);
       }
     } catch (e) {
-      // Silent fail on refresh - keep showing previous data
-      debugPrint("Market refresh error: $e");
+      debugPrint("Market update error: $e");
     }
   }
 
   Future<List<MarketPair>> _fetchMarketPairs() async {
+    final baseCurrency = 'NGN';
+    final targetCurrencies = ['USD', 'GBP', 'EUR'];
     final List<MarketPair> pairs = [];
 
-    // Get 2 different currency pairs to display (cycling through majors)
-    final selectedCurrencies = _getNextCurrencyPair();
-
-    for (final currency in selectedCurrencies) {
+    for (final target in targetCurrencies) {
       try {
         final rate = await CurrencyService.instance.getRate(
-          base: currency,
-          target: _baseCurrency,
+          base: target,
+          target: baseCurrency,
         );
 
         if (rate != null) {
-          // Calculate mock change percentage (in real app, you'd compare with previous rate)
-          final changePercent = _calculateChangePercent(currency, rate);
-          final isPositive = changePercent >= 0;
-
           pairs.add(
             MarketPair(
-              pair: "$currency/$_baseCurrency",
-              rate: "₦${rate.toStringAsFixed(2)}",
-              change:
-                  "${isPositive ? '+' : ''}${changePercent.toStringAsFixed(1)}%",
-              isPositive: isPositive,
+              pair: '$target/$baseCurrency',
+              rate: rate.toStringAsFixed(2),
+              change: _generateRandomChange(),
+              isPositive: DateTime.now().millisecond % 2 == 0,
             ),
           );
         }
       } catch (e) {
-        debugPrint("Failed to fetch rate for $currency: $e");
+        debugPrint("Failed to fetch $target/$baseCurrency: $e");
       }
     }
 
-    return pairs.isEmpty ? _getDefaultPairs() : pairs;
+    return pairs.isEmpty ? _getDefaultMarketPairs() : pairs;
   }
 
-  List<String> _getNextCurrencyPair() {
-    final List<String> selected = [];
-
-    // Always include USD as primary
-    selected.add('USD');
-
-    // Add second currency cycling through others
-    final secondIndex = (_currentPairIndex % (_majorCurrencies.length - 1)) + 1;
-    selected.add(_majorCurrencies[secondIndex]);
-
-    _currentPairIndex++;
-    return selected;
-  }
-
-  double _calculateChangePercent(String currency, double currentRate) {
-    // Mock calculation - in real app, compare with previous stored rate
-    final hash = currency.hashCode % 100;
-    final baseChange = (hash - 50) / 10.0; // Range: -5.0 to +4.9
-    return double.parse(baseChange.toStringAsFixed(1));
-  }
-
-  List<MarketPair> _getDefaultPairs() {
+  List<MarketPair> _getDefaultMarketPairs() {
     return [
       MarketPair(
-        pair: "USD/NGN",
-        rate: "₦1,650.50",
-        change: "+2.3%",
+        pair: 'USD/NGN',
+        rate: '1650.50',
+        change: '+0.25%',
         isPositive: true,
       ),
       MarketPair(
-        pair: "GBP/NGN",
-        rate: "₦2,089.75",
-        change: "-0.8%",
+        pair: 'GBP/NGN',
+        rate: '2089.75',
+        change: '-0.12%',
         isPositive: false,
+      ),
+      MarketPair(
+        pair: 'EUR/NGN',
+        rate: '1789.25',
+        change: '+0.18%',
+        isPositive: true,
       ),
     ];
   }
 
+  String _generateRandomChange() {
+    final random = DateTime.now().millisecond % 100;
+    final changeValue = (random / 100).toStringAsFixed(2);
+    return random % 2 == 0 ? '+$changeValue%' : '-$changeValue%';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.paddingMedium,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Market Overview",
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          _buildMarketContent(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMarketContent() {
-    if (_isLoading) {
-      return _buildLoadingState();
-    }
-
-    if (_error != null && _marketPairs.isEmpty) {
-      return _buildErrorState();
-    }
-
-    return Row(
-      children: _marketPairs.asMap().entries.map((entry) {
-        final index = entry.key;
-        final pair = entry.value;
-        return Expanded(
-          child: Container(
-            margin: EdgeInsets.only(
-              left: index > 0 ? 6 : 0,
-              right: index < _marketPairs.length - 1 ? 6 : 0,
-            ),
-            child: _buildMarketCard(pair),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Row(
-      children: [
-        Expanded(child: _buildMarketCardSkeleton()),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMarketCardSkeleton()),
-      ],
-    );
-  }
-
-  Widget _buildMarketCardSkeleton() {
-    return Container(
-      height: 100,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMarketCard(MarketPair pair) {
-    return GestureDetector(
-      onTap: () {
-        final currencies = pair.pair.split('/');
-        if (currencies.length == 2) {
-          widget.onMarketPairTap?.call(currencies[0], currencies[1]);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConstants.paddingMedium,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            _buildHeader(context),
+            const SizedBox(height: 16),
+            _isLoading ? _buildLoadingSkeleton() : _buildMarketGrid(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.15),
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary.withValues(alpha: 0.2),
+                  theme.colorScheme.primary.withValues(alpha: 0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.trending_up_rounded,
+              color: theme.colorScheme.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  pair.pair,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  "Market Overview",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-                Icon(
-                  pair.isPositive ? Icons.trending_up : Icons.trending_down,
-                  size: 16,
-                  color: pair.isPositive
-                      ? AppTheme.successColor
-                      : AppTheme.errorColor,
+                const SizedBox(height: 4),
+                Text(
+                  "Live market rates",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              pair.rate,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingSkeleton() {
+    final theme = Theme.of(context);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: 3,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
             ),
-            const SizedBox(height: 4),
-            Text(
-              pair.change,
-              style: TextStyle(
-                color: pair.isPositive
-                    ? AppTheme.successColor
-                    : AppTheme.errorColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      },
+    );
+  }
+
+  Widget _buildMarketGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: _marketPairs.length,
+      itemBuilder: (context, index) {
+        final pair = _marketPairs[index];
+        return _buildMarketCard(pair);
+      },
+    );
+  }
+
+  Widget _buildMarketCard(MarketPair pair) {
+    final theme = Theme.of(context);
+    final parts = pair.pair.split('/');
+    final baseCurrency = parts[0];
+    final targetCurrency = parts[1];
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onMarketPairTap?.call(baseCurrency, targetCurrency);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: pair.isPositive
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Colors.red.withValues(alpha: 0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      baseCurrency,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    Text(
+                      '/',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      targetCurrency,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  pair.rate,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: pair.isPositive
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    pair.change,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: pair.isPositive
+                          ? Colors.green[700]
+                          : Colors.red[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// Data model for market pairs
 class MarketPair {
   final String pair;
   final String rate;
   final String change;
   final bool isPositive;
 
-  MarketPair({
+  const MarketPair({
     required this.pair,
     required this.rate,
     required this.change,

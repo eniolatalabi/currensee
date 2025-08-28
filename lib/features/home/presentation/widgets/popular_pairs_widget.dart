@@ -1,43 +1,121 @@
+// lib/features/home/presentation/widgets/popular_pairs_widget.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/constants.dart';
 import '../../../../data/services/currency_service.dart';
 
-class PopularPairsWidget extends StatefulWidget {
-  final Function(String, String)? onPopularPairTap;
+// PopularPair model class
+class PopularPair {
+  final String from;
+  final String to;
+  final String rate;
 
-  const PopularPairsWidget({super.key, this.onPopularPairTap});
-
-  @override
-  State<PopularPairsWidget> createState() => _PopularPairsWidgetState();
+  const PopularPair({required this.from, required this.to, required this.rate});
 }
 
-class _PopularPairsWidgetState extends State<PopularPairsWidget> {
+class EnhancedPopularPairsWidget extends StatefulWidget {
+  final Function(String, String)? onPopularPairTap;
+
+  const EnhancedPopularPairsWidget({super.key, this.onPopularPairTap});
+
+  @override
+  State<EnhancedPopularPairsWidget> createState() =>
+      _EnhancedPopularPairsWidgetState();
+}
+
+class _EnhancedPopularPairsWidgetState extends State<EnhancedPopularPairsWidget>
+    with TickerProviderStateMixin {
   Timer? _priceUpdateTimer;
   List<PopularPair> _popularPairs = [];
   bool _isLoading = true;
   String? _error;
 
-  // Popular currency pairs - most commonly converted to NGN
+  // Animation controllers
+  late final AnimationController _pulseController;
+  late final AnimationController _shimmerController;
+  late final AnimationController _cardController;
+  late final AnimationController _floatingController;
+
+  // Animations
+  late final Animation<double> _pulseAnimation;
+  late final Animation<double> _shimmerAnimation;
+  late final Animation<double> _cardScaleAnimation;
+  late final Animation<double> _floatingAnimation;
+
   final List<String> _popularCurrencies = ['USD', 'GBP', 'EUR', 'CAD'];
   final String _baseCurrency = 'NGN';
+
+  // Color palette for cards
+  final List<List<Color>> _cardGradients = [
+    [Color(0xFF667eea), Color(0xFF764ba2)], // Purple-blue
+    [Color(0xFF11998e), Color(0xFF38ef7d)], // Teal-green
+    [Color(0xFFfc4a1a), Color(0xFFf7b733)], // Orange-yellow
+    [Color(0xFF4facfe), Color(0xFF00f2fe)], // Blue-cyan
+  ];
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize animation controllers
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _cardController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _floatingController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+
+    // Setup animations
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _shimmerAnimation = Tween<double>(begin: -1.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+    );
+
+    _cardScaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _cardController, curve: Curves.elasticOut),
+    );
+
+    _floatingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
+    );
+
     _loadPopularPairs();
     _startPriceUpdates();
+
+    // Start continuous animations
+    _shimmerController.repeat(reverse: true);
+    _floatingController.repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _priceUpdateTimer?.cancel();
+    _pulseController.dispose();
+    _shimmerController.dispose();
+    _cardController.dispose();
+    _floatingController.dispose();
     super.dispose();
   }
 
   void _startPriceUpdates() {
-    // Update prices every 30 seconds (less frequent than market overview)
-    _priceUpdateTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _priceUpdateTimer = Timer.periodic(const Duration(seconds: 35), (_) {
       _updatePrices();
     });
   }
@@ -48,6 +126,9 @@ class _PopularPairsWidgetState extends State<PopularPairsWidget> {
       _error = null;
     });
 
+    // Simulate loading for better UX
+    await Future.delayed(const Duration(milliseconds: 1000));
+
     try {
       final pairs = await _fetchPopularPairs();
       if (mounted) {
@@ -55,23 +136,34 @@ class _PopularPairsWidgetState extends State<PopularPairsWidget> {
           _popularPairs = pairs;
           _isLoading = false;
         });
+
+        // Trigger card entrance animation
+        _cardController.forward();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = "Failed to load currency pairs";
           _isLoading = false;
+          _popularPairs = _getDefaultPairs();
         });
+        _cardController.forward();
       }
-      debugPrint("Popular pairs error: $e");
     }
   }
 
   Future<void> _updatePrices() async {
-    if (_popularPairs.isEmpty) return;
+    if (_popularPairs.isEmpty || !mounted) return;
+
+    // Subtle pulse animation during update
+    _pulseController.forward().then((_) {
+      if (mounted) _pulseController.reverse();
+    });
+
+    // Add haptic feedback
+    HapticFeedback.lightImpact();
 
     try {
-      // Update prices without showing loading state
       for (int i = 0; i < _popularPairs.length; i++) {
         final pair = _popularPairs[i];
         final rate = await CurrencyService.instance.getRate(
@@ -90,7 +182,6 @@ class _PopularPairsWidgetState extends State<PopularPairsWidget> {
         }
       }
     } catch (e) {
-      // Silent fail on price updates - keep showing previous data
       debugPrint("Price update error: $e");
     }
   }
@@ -119,7 +210,6 @@ class _PopularPairsWidgetState extends State<PopularPairsWidget> {
       }
     }
 
-    // Fallback to default pairs if API fails completely
     return pairs.isEmpty ? _getDefaultPairs() : pairs;
   }
 
@@ -141,180 +231,207 @@ class _PopularPairsWidgetState extends State<PopularPairsWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Popular Currency Pairs",
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          _buildPopularPairsContent(),
+          _buildAdvancedHeader(context),
+          const SizedBox(height: 16),
+          _isLoading
+              ? _buildAdvancedSkeleton(context)
+              : _buildPopularPairsContent(),
         ],
       ),
     );
   }
 
-  Widget _buildPopularPairsContent() {
-    if (_isLoading) {
-      return const SizedBox(
-        height: 120,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
+  Widget _buildAdvancedHeader(BuildContext context) {
+    final theme = Theme.of(context);
 
-    if (_error != null && _popularPairs.isEmpty) {
-      return Container(
-        height: 120,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.secondaryContainer.withValues(alpha: 0.15),
+            theme.colorScheme.secondaryContainer.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: Theme.of(context).colorScheme.error,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.secondary.withValues(alpha: 0.2),
+                  theme.colorScheme.secondary.withValues(alpha: 0.1),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.currency_exchange_rounded,
+              color: theme.colorScheme.secondary,
+              size: 20,
+            ),
           ),
-        ),
-      );
-    }
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Popular Currency Pairs",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Live exchange rates",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return SizedBox(
-      height: 120,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
+  Widget _buildAdvancedSkeleton(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.6,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      },
+    );
+  }
+
+  Widget _buildPopularPairsContent() {
+    return ScaleTransition(
+      scale: _cardScaleAnimation,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 1.6,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
         itemCount: _popularPairs.length,
         itemBuilder: (context, index) {
           final pair = _popularPairs[index];
-          return _buildPopularPairCard(pair, index, _popularPairs.length);
+          return _buildEnhancedPairCard(pair, index);
         },
       ),
     );
   }
 
-  Widget _buildPopularPairCard(PopularPair pair, int index, int total) {
-    return GestureDetector(
-      onTap: () => widget.onPopularPairTap?.call(pair.from, pair.to),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 140,
-        margin: EdgeInsets.only(right: index < total - 1 ? 12 : 0),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.primary,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+  Widget _buildEnhancedPairCard(PopularPair pair, int index) {
+    final theme = Theme.of(context);
+    final gradientColors = _cardGradients[index % _cardGradients.length];
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onPopularPairTap?.call(pair.from, pair.to);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors
+                  .map((c) => c.withValues(alpha: 0.1))
+                  .toList(),
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: gradientColors.first.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildCurrencyFlag(pair.from),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-                const SizedBox(width: 4),
-                _buildCurrencyFlag(pair.to),
+                Row(
+                  children: [
+                    Text(
+                      pair.from,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: gradientColors.first,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      pair.to,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: gradientColors.last,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  pair.rate,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "1 ${pair.from} = ${pair.rate} ${pair.to}",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
               ],
             ),
-            Text(
-              "${pair.from}/${pair.to}",
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-            Text(
-              "₦${pair.rate}",
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrencyFlag(String currency) {
-    // Get currency symbol or abbreviation
-    final displayText = _getCurrencySymbol(currency);
-
-    return Container(
-      width: 24,
-      height: 16,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(2),
-      ),
-      child: Center(
-        child: Text(
-          displayText,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 8,
-            fontWeight: FontWeight.bold,
           ),
         ),
       ),
     );
   }
-
-  String _getCurrencySymbol(String currency) {
-    switch (currency) {
-      case 'USD':
-        return '\$';
-      case 'GBP':
-        return '£';
-      case 'EUR':
-        return '€';
-      case 'NGN':
-        return '₦';
-      case 'CAD':
-        return 'C\$';
-      case 'AUD':
-        return 'A\$';
-      case 'JPY':
-        return '¥';
-      case 'CHF':
-        return 'Fr';
-      default:
-        return currency;
-    }
-  }
-}
-
-// Data model for popular pairs
-class PopularPair {
-  final String from;
-  final String to;
-  final String rate;
-
-  PopularPair({required this.from, required this.to, required this.rate});
 }
